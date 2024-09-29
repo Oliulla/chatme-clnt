@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
 import { useRouter } from "next/navigation";
-
-const socket = io("http://localhost:4080/chat");
 
 export default function ChatRoom() {
   const [messages, setMessages] = useState<any[]>([]);
@@ -21,6 +19,8 @@ export default function ChatRoom() {
   const [supervisorId, setSupervisor] = useState("");
   const [role, setRole] = useState("");
   const router = useRouter();
+
+  const socketRef = useRef<any>(null);
 
   const senderId = userId;
 
@@ -47,7 +47,6 @@ export default function ChatRoom() {
       );
       if (response.ok) {
         const data = await response.json();
-
         setMessages(data);
       } else {
         console.error("Failed to fetch messages");
@@ -58,6 +57,10 @@ export default function ChatRoom() {
   };
 
   useEffect(() => {
+    if (!socketRef.current) {
+      socketRef.current = io("http://localhost:4080/chat");
+    }
+
     const userId = localStorage.getItem("userId") || "User1";
     const username = localStorage.getItem("username") || "User1";
     const supervisorId = localStorage.getItem("supervisor") || "User1";
@@ -71,51 +74,51 @@ export default function ChatRoom() {
     fetchUsers();
     fetchMessages(receiver?.id);
 
-    socket.on("message", (data: string) => {
+    socketRef.current.on("message", (data: any) => {
       setMessages((prev) => [...prev, data]);
     });
 
-    socket.on("typing", (data: { username: string }) => {
+    socketRef.current.on("typing", (data: { username: string }) => {
       if (data.username !== username) {
         setIsTyping(`${data.username} is typing...`);
       }
     });
 
-    socket.on("stopTyping", (data: { username: string }) => {
+    socketRef.current.on("stopTyping", (data: { username: string }) => {
       if (data.username !== username) {
         setIsTyping(null);
       }
     });
 
     return () => {
-      socket.off("message");
-      socket.off("typing");
-      socket.off("stopTyping");
+      socketRef.current.off("message");
+      socketRef.current.off("typing");
+      socketRef.current.off("stopTyping");
     };
-  }, [username, userId, supervisorId, role]);
+  }, [receiver?.id, userId, username]);
 
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
     if (!typing) {
       setTyping(true);
-      socket.emit("typing", { username });
+      socketRef.current.emit("typing", { username });
     }
 
     setTimeout(() => {
       setTyping(false);
-      socket.emit("stopTyping", { username });
+      socketRef.current.emit("stopTyping", { username });
     }, 1000);
   };
 
   const sendMessage = () => {
     if (message.trim() && receiver.id) {
-      socket.emit("message", {
+      socketRef.current.emit("message", {
         senderId: userId,
         receiverId: receiver.id,
         message: message.trim(),
       });
       setMessage("");
-      socket.emit("stopTyping", { username });
+      socketRef.current.emit("stopTyping", { username });
     }
   };
 
@@ -129,7 +132,7 @@ export default function ChatRoom() {
     router.push("/auth/signin");
   };
 
-  const handleReciver = (id: string, username: string) => {
+  const handleReceiver = (id: string, username: string) => {
     setReceiver({
       name: username,
       id: id,
@@ -151,7 +154,7 @@ export default function ChatRoom() {
                 <li
                   key={user._id}
                   className="text-blue-600 cursor-pointer my-2"
-                  onClick={() => handleReciver(user._id, user?.username)}
+                  onClick={() => handleReceiver(user._id, user?.username)}
                 >
                   {user.username}
                 </li>
@@ -183,8 +186,8 @@ export default function ChatRoom() {
                     <p
                       className={`inline-block px-4 py-2 my-1 rounded-lg ${
                         senderId === userId
-                          ? "bg-blue-500 text-white self-end mr-2"
-                          : "bg-green-500 text-white self-start"
+                          ? "bg-blue-500 text-white self-end mr-2 max-w-[75%]"
+                          : "bg-green-500 text-white self-start max-w-[75%]"
                       }`}
                     >
                       {msg}
