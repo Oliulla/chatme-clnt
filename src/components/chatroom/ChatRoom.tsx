@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 const socket = io("http://localhost:4080/chat");
 
 export default function ChatRoom() {
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [typing, setTyping] = useState(false);
   const [isTyping, setIsTyping] = useState<string | null>(null);
@@ -16,51 +16,60 @@ export default function ChatRoom() {
     id: "",
     name: "",
   });
-
-  const userId = localStorage.getItem("userId") || "User1";
-  const username = localStorage.getItem("username") || "User1";
-  const supervisorId = localStorage.getItem("supervisor") || "User1";
-  const role = localStorage.getItem("role") || "CM";
+  const [userId, setUserId] = useState("");
+  const [username, setUsername] = useState("");
+  const [supervisorId, setSupervisor] = useState("");
+  const [role, setRole] = useState("");
   const router = useRouter();
 
   const senderId = userId;
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await fetch(
-          `http://localhost:4080/v1/auth/users?id=${userId}`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setUsers(data);
-        } else {
-          console.error("Failed to fetch user data");
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:4080/v1/auth/users?id=${userId}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      } else {
+        console.error("Failed to fetch user data");
       }
-    };
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+    }
+  };
+
+  const fetchMessages = async (id: string) => {
+    try {
+      const response = await fetch(
+        `http://localhost:4080/v1/chat/messages/${senderId}/${id}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+
+        setMessages(data);
+      } else {
+        console.error("Failed to fetch messages");
+      }
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
+  };
+
+  useEffect(() => {
+    const userId = localStorage.getItem("userId") || "User1";
+    const username = localStorage.getItem("username") || "User1";
+    const supervisorId = localStorage.getItem("supervisor") || "User1";
+    const role = localStorage.getItem("role") || "CM";
+
+    setUserId(userId);
+    setUsername(username);
+    setSupervisor(supervisorId);
+    setRole(role);
 
     fetchUsers();
-
-    const fetchMessages = async () => {
-      try {
-        const response = await fetch(
-          `http://localhost:4080/v1/chat/messages/${senderId}/${receiver?.id}`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setMessages(data);
-        } else {
-          console.error("Failed to fetch messages");
-        }
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-      }
-    };
-
-    fetchMessages();
+    fetchMessages(receiver?.id);
 
     socket.on("message", (data: string) => {
       setMessages((prev) => [...prev, data]);
@@ -99,8 +108,12 @@ export default function ChatRoom() {
   };
 
   const sendMessage = () => {
-    if (message.trim()) {
-      socket.emit("message", `${username}: ${message}`);
+    if (message.trim() && receiver.id) {
+      socket.emit("message", {
+        senderId: userId,
+        receiverId: receiver.id,
+        message: message.trim(),
+      });
       setMessage("");
       socket.emit("stopTyping", { username });
     }
@@ -121,9 +134,9 @@ export default function ChatRoom() {
       name: username,
       id: id,
     });
-  };
 
-  console.log(receiver, "rec");
+    fetchMessages(id);
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen">
@@ -146,44 +159,61 @@ export default function ChatRoom() {
             </ul>
           </div>
         </div>
-        <div className=" bg-gray-100">
-          <h1 className="text-3xl font-bold mb-4">Chat Room</h1>
-          <button
-            onClick={handleLogout}
-            className="mb-4 bg-red-500 text-white p-2 rounded-lg hover:bg-red-600"
-          >
-            Logout, I am {role === "CM" ? "a" : "an"} {role}
-          </button>
+        <div>
+          <div className="bg-gray-100">
+            <h1 className="text-3xl font-bold mb-4">Chat Room</h1>
+            <button
+              onClick={handleLogout}
+              className="mb-4 bg-red-500 text-white p-2 rounded-lg hover:bg-red-600"
+            >
+              Logout, I am {role === "CM" ? "a" : "an"} {role}
+            </button>
 
-          <div className="w-full max-w-xl bg-white p-4 shadow-lg rounded-lg mb-4">
-            <div className="h-64 overflow-y-scroll mb-4">
-              {messages.map((msg, index) => (
-                <p key={index} className="text-sm text-gray-800 mb-1">
-                  {msg}
-                </p>
-              ))}
-            </div>
+            {receiver?.id && <h3>You're chatting with: {receiver?.name}</h3>}
 
-            {isTyping && (
-              <p className="text-sm text-gray-500 mb-2">{isTyping}</p>
-            )}
+            <div className="w-full max-w-xl bg-white p-4 shadow-lg rounded-lg mb-4">
+              <div className="h-64 overflow-y-scroll mb-4">
+                {messages.map(({ message: msg, sender: senderId }, index) => (
+                  <div
+                    key={index}
+                    className={`text-sm mb-1 flex ${
+                      senderId === userId ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <p
+                      className={`inline-block px-4 py-2 my-1 rounded-lg ${
+                        senderId === userId
+                          ? "bg-blue-500 text-white self-end mr-2"
+                          : "bg-green-500 text-white self-start"
+                      }`}
+                    >
+                      {msg}
+                    </p>
+                  </div>
+                ))}
+              </div>
 
-            <div className="flex items-center">
-              <input
-                type="text"
-                value={message}
-                onChange={handleTyping}
-                placeholder="Type a message..."
-                className="flex-1 p-2 border rounded-lg border-gray-300 mr-2"
-              />
-              {receiver?.id && (
-                <button
-                  onClick={sendMessage}
-                  className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600"
-                >
-                  Send
-                </button>
+              {isTyping && (
+                <p className="text-sm text-gray-500 mb-2">{isTyping}</p>
               )}
+
+              <div className="flex items-center">
+                <input
+                  type="text"
+                  value={message}
+                  onChange={handleTyping}
+                  placeholder="Type a message..."
+                  className="flex-1 p-2 border rounded-lg border-gray-300 mr-2"
+                />
+                {receiver?.id && (
+                  <button
+                    onClick={sendMessage}
+                    className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600"
+                  >
+                    Send
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
