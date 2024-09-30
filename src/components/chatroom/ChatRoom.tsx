@@ -164,7 +164,7 @@ export default function ChatRoom() {
         </div>
         <div>
           <div className="bg-gray-100">
-            <h1 className="text-3xl font-bold mb-4">Chat Room</h1>
+            <h1 className="text-3xl font-bold mb-4">Chat Room: ({username})</h1>
             <button
               onClick={handleLogout}
               className="mb-4 bg-red-500 text-white p-2 rounded-lg hover:bg-red-600"

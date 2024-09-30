@@ -1,6 +1,9 @@
 import Home from "@/components/home/Home";
 
-
 export default async function page() {
-   return <Home />
+  return (
+    <div className="bg-[#232325]">
+      <Home />
+    </div>
+  );
 }
