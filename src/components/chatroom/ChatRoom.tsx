@@ -26,12 +26,21 @@ export default function ChatRoom() {
 
   const fetchUsers = async () => {
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://localhost:4080/v1/auth/users?id=${userId}`
+        "http://localhost:4002/api/v1/user/find-subordinates",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
+
       if (response.ok) {
         const data = await response.json();
-        setUsers(data);
+        setUsers(data?.data);
       } else {
         console.error("Failed to fetch user data");
       }
@@ -42,9 +51,18 @@ export default function ChatRoom() {
 
   const fetchMessages = async (id: string) => {
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://localhost:4080/v1/chat/messages/${senderId}/${id}`
+        `http://localhost:4002/api/v1/chat/messages/${receiver?.id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
+
       if (response.ok) {
         const data = await response.json();
         setMessages(data);
@@ -57,8 +75,11 @@ export default function ChatRoom() {
   };
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
     if (!socketRef.current) {
-      socketRef.current = io("http://localhost:4080/chat");
+      socketRef.current = io("http://localhost:4002/chat", {
+        query: { token: token },
+      });
     }
 
     const userId = localStorage.getItem("userId") || "User1";
